@@ -78,3 +78,45 @@ What operations need idempotency keys?
   JOIN follows ON follows.followee_id = users.id
   WHERE follows.follower_id = :current_user;
     ```
+
+
+# Latency vs Response Time
+
+### Response time
+
+Response time = latency + service time + network delays
+its the end to end processing time
+
+### Latency
+Latency = queueing delay + other pre-service delays(CPU wait, I/O wait, free thread/connection wait)
+in short request is waiting, but not doing any work
+
+# Percentiles
+
+- Service performance is measured in percentile duration of request, for eg. amazon uses p999 ie. 999 out of 1000 requests should be completed within SLA(service level agreement)
+- Optimizing for much higer percentiles like p9999 is very costly and mostly out of control like network delays, CPU limitations etc.
+- Head of line blocking - small number of slow requests block processing of further requests
+
+## Tail Latency Amplification (Why p99 matters)
+
+**Assume:**
+- Each backend call has a **1% chance** of being slow (p99)
+- A user request makes **N backend calls**
+- probability = 1 - (0.99)^N
+
+**Question:** What’s the chance *at least one* call is slow?
+
+**Answer:**
+
+- N = 1  → **1%**
+- N = 10 → **~9.6%**
+- N = 50 → **~39%**
+- N = 100 → **~63%**
+
+A “rare” slow call quickly becomes **common** for users.
+
+**This effect is called _tail latency amplification_.**
+
+TODO Note- read about correct algorithms for percentile computations
+
+
