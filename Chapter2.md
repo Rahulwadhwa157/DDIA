@@ -71,4 +71,78 @@ Data was accessed by manually navigating predefined paths, which was fast but ma
 - Data is **heterogeneous** (different structures in same collection)
 - Many object types or frequently changing formats
 
+## Declarative vs Imperative Queries
+
+### Imperative (How)
+- Specifies exact steps to get data.
+- Algorithm and order are fixed.
+- Hard to optimize and parallelize.
+
+### Declarative (What) – SQL
+- Specifies only the result pattern.
+- Database chooses execution strategy.
+- Easier to write and maintain.
+
+---
+
+### Why Declarative is Powerful
+- Enables query optimizer to choose best plan.
+- Hides storage and indexing details.
+- Allows DB to improve performance without changing queries.
+- Naturally supports parallel execution.
+
+---
+
+**Key Insight:**  
+Declarative queries describe *what you want*, not *how to compute it*, giving the database freedom to optimize and scale.
+
+
+## Property Graph Model
+
+### What is it?
+A **property graph** represents data as:
+- **Vertices (nodes)** → entities (people, places, things)
+- **Edges (relationships)** → connections between entities  
+Both vertices and edges can store **properties (key–value pairs)**.
+
+---
+
+### Core Structure
+
+Each **Vertex** has:
+- Unique ID
+- Incoming edges
+- Outgoing edges
+- Properties (JSON)
+
+Each **Edge** has:
+- Unique ID
+- Tail vertex (start)
+- Head vertex (end)
+- Label (type of relationship)
+- Properties (JSON)
+
+---
+
+### Relational Representation
+
+```sql
+CREATE TABLE vertices (
+  vertex_id INT PRIMARY KEY,
+  properties JSON
+);
+
+CREATE TABLE edges (
+  edge_id INT PRIMARY KEY,
+  tail_vertex INT REFERENCES vertices(vertex_id),
+  head_vertex INT REFERENCES vertices(vertex_id),
+  label TEXT,
+  properties JSON
+);
+
+CREATE INDEX edges_tails ON edges(tail_vertex);
+CREATE INDEX edges_heads ON edges(head_vertex);
+
+
+
 
