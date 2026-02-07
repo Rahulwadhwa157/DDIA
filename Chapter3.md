@@ -132,3 +132,108 @@ An **SSTable** is a segment file where:
 ## Key Idea
 > SSTables optimize for **sequential writes + low random I/O**, trading CPU for disk efficiency.
 
+
+# B-Trees
+
+## Branching Factor
+no. of references(pointers) to child pages
+
+
+# B-Trees — Insert & Update Operations
+
+![alt text](Images/image2.png)
+
+## Overview
+
+A **B-tree** is a balanced multi-way search tree widely used in databases and file systems for efficient storage and retrieval of sorted key–value data.
+
+### Key Properties
+
+- Data stored in **fixed-size pages** (typically 4 KB).
+- Keys inside a node are stored in **sorted order**.
+- Internal nodes contain keys and child page references.
+- Leaf nodes contain key-value pairs (or pointers to data).
+- All leaves are at the same depth.
+- Time complexity:
+  - Search: `O(log n)`
+  - Insert: `O(log n)`
+  - Delete: `O(log n)`
+
+---
+
+## Insert Operation
+
+### Steps
+
+1. Start at the root and traverse to the correct **leaf page**.
+2. Insert the key in sorted order within the leaf.
+3. If the page overflows:
+   - Split the page into two half-full pages.
+   - Promote the middle key to the parent.
+4. If the parent overflows, repeat the split upward.
+5. If the root splits, create a new root.
+
+### Result
+
+- Tree always remains balanced.
+- Height increases only when the root splits.
+
+---
+
+### Insert Algorithm (Pseudo Code)
+
+```text
+INSERT(T, key):
+
+node = FIND_LEAF(T.root, key)
+INSERT_IN_ORDER(node, key)
+
+while node is overfull:
+    left, right, middle = SPLIT(node)
+
+    if node is root:
+        new_root = CREATE_NODE(middle)
+        new_root.children = [left, right]
+        T.root = new_root
+        break
+    else:
+        INSERT_IN_PARENT(node.parent, middle)
+        node = node.parent
+
+
+```
+
+**B-trees are made reliable by WAL**
+
+```pgsql
+Write WAL → Flush → Apply pages → Checkpoint → Delete old WAL
+
+```
+
+```cpp
+struct LogRecord {
+    LSN                // log sequence number (monotonic)
+    TransactionID
+    PageID
+    PrevLSN            // previous log of same transaction
+    Type               // INSERT, UPDATE, DELETE, SPLIT
+    RedoInfo           // how to redo change
+    UndoInfo           // how to undo change
+}
+
+Eg.
+
+Log Record:
+LSN = 5001
+PageID = 105
+Offset = 128
+Before = [00 1A]
+After  = [00 2B]
+
+
+
+```
+
+**LSM-trees are typically faster for writes, whereas B-trees
+are thought to be faster for reads**
+
