@@ -237,3 +237,214 @@ After  = [00 2B]
 **LSM-trees are typically faster for writes, whereas B-trees
 are thought to be faster for reads**
 
+# Column-Oriented Storage — Core Notes
+
+## Problem Context
+- Fact tables in data warehouses can contain **trillions of rows**, **petabytes of data**, and **100+ columns**.
+- Analytical queries usually access only a **small subset of columns** (e.g., 3–5 columns).
+- Row-oriented storage wastes I/O by reading unnecessary data.
+
+---
+
+## Row-Oriented Storage (OLTP Style)
+- Data for each row is stored contiguously.
+- Good for:
+  - Point lookups
+  - Frequent inserts/updates
+  - Retrieving full records
+- Problem for analytics:
+  - Queries must read entire rows even if only a few columns are needed.
+  - High disk I/O + parsing overhead.
+
+---
+
+## Column-Oriented Storage (OLAP Style)
+### Core Idea
+- Store data **column-wise instead of row-wise**.
+- Each column is stored separately (often as independent files).
+
+### Example
+Query needs:
+- `date_key`
+- `product_sk`
+- `quantity`
+
+Only these column files are scanned; all other columns are skipped.
+
+---
+
+## Why It Improves Performance
+- **Reduced I/O**: read only required columns.
+- **Better CPU efficiency**: less parsing/deserialization.
+- **Higher compression**:
+  - Column values are homogeneous.
+  - Enables techniques like run-length encoding and dictionary compression.
+- **Vectorized processing** becomes easier.
+
+---
+
+## Key Requirement
+- All column files must preserve the **same row order**.
+- Row reconstruction:
+  - Combine the *i-th* value from each column to rebuild row *i*.
+
+---
+
+## Applicability
+- Common in analytics/data warehouses.
+- Works for both:
+  - Relational models
+  - Document models (e.g., **Parquet**, based on Dremel).
+
+---
+
+## Trade-offs
+| Aspect | Row-Oriented | Column-Oriented |
+|---|---|---|
+| OLTP workloads | Excellent | Poor |
+| Analytics (aggregations/scans) | Inefficient | Excellent |
+| Full-row reads | Fast | Slower |
+| Compression | Moderate | High |
+
+---
+
+## Mental Model
+- **Row storage** → optimize for transactions.
+- **Column storage** → optimize for scans and aggregations.
+
+
+
+# Bitmap Index Bitwise Optimization (Compressed vs Uncompressed)
+
+## 1. Overview
+
+A **bitmap index** represents each distinct value in a column as a bitmap.
+
+- One bitmap per distinct value
+- One bit per row
+- Bit = `1` → row contains the value
+- Bit = `0` → otherwise
+
+Example:
+
+| Row | product_sk |
+|---|---|
+| 1 | 30 |
+| 2 | 68 |
+| 3 | 69 |
+| 4 | 31 |
+| 5 | 30 |
+
+Bitmaps:
+
+---
+
+## 2. Why Bitmap Indexes?
+
+Bitmap indexes are optimized for analytical workloads:
+
+- Filtering
+- Aggregations
+- Multi-condition queries
+- Data warehouse workloads
+
+Queries are executed using **bitwise operations**, which are extremely fast on CPUs.
+
+---
+
+## 3. Uncompressed Bitmap Operations
+
+### 3.1 OR operation
+
+Query:
+
+```sql
+WHERE product_sk IN (30, 68, 69)
+30 → 1 0 0 0 1
+68 → 0 1 0 0 0
+69 → 0 0 1 0 0
+----------------
+OR → 1 1 1 0 1
+
+
+WHERE product_sk = 31 AND store_sk = 3
+result = bitmap(product=31) AND bitmap(store=3)
+
+This works because:
+
+Columns maintain the same row order.
+
+Bit position k corresponds to the same row across columns.
+
+Time ≈ O(number of bits);
+```
+
+
+Problem with Large Bitmaps
+
+When:
+
+number of rows is very large
+
+number of distinct values is large
+
+**Run-Length Encoding**
+
+Instead of storing bits directly:
+0000001111000
+
+(6 zeros), (4 ones), (3 zeros)
+
+# Compressed Bitmap Operations (Key Idea)
+
+## Important
+
+Bitmaps are **NOT decompressed** before performing `AND` / `OR` operations.
+
+Operations are performed **directly on compressed runs**.
+
+---
+
+## Example
+
+### Bitmap A
+
+- (5 zeros)
+- (4 ones)
+- (4 zeros)
+
+### Bitmap B
+
+- (7 zeros)
+- (4 ones)
+- (2 zeros)
+
+---
+
+## Process
+
+Runs are processed similarly to **merging sorted lists**.
+
+### AND operation on runs
+
+Compare run-by-run:
+0 × 5 AND 0 × 7 → 0 × 5
+1 × 4 AND 0 × 2 → 0 × 2
+
+
+Only **run lengths** are processed — individual bits are never expanded.
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
